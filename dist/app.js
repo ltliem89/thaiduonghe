@@ -22437,7 +22437,7 @@ void main() {
     }
     const line = new Line(
       new BufferGeometry().setFromPoints(pts),
-      new LineBasicMaterial({ color: 3818326, transparent: true, opacity: 0.5 })
+      new LineBasicMaterial({ color: 3818326, transparent: true, opacity: 0.55 })
     );
     orbitLines.add(line);
   }

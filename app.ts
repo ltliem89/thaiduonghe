@@ -731,7 +731,7 @@ for (const spec of PLANETS) {
   }
   const line = new THREE.Line(
     new THREE.BufferGeometry().setFromPoints(pts),
-    new THREE.LineBasicMaterial({ color: 0x3a4356, transparent: true, opacity: 0.5 }),
+    new THREE.LineBasicMaterial({ color: 0x3a4356, transparent: true, opacity: 0.55 }),
   );
   orbitLines.add(line);
 }
