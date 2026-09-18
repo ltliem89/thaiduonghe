@@ -78,6 +78,12 @@ interface SurfaceSpec {
   blobs?: { color: string; count: number; size: number; squash: number }[];
   craters?: number;
   grain?: number;
+  wavy?: { color: string; y: number; h: number; amp: number; freq: number }[];
+  swirl?: { color: string; cx: number; cy: number; rx: number; ry: number; rot: number }[];
+  polarCaps?: { color: string; latitude: number }[];
+  spots?: { color: string; count: number; size: number; core?: string }[];
+  granulation?: { size: number; contrast: number };
+  cloudLayer?: { color: string; opacity: number; count: number; size: number }[];
 }
 
 const MAX_ANISO = renderer.capabilities.getMaxAnisotropy();
@@ -180,6 +186,159 @@ function buildSurface(spec: SurfaceSpec, width = 1024, height = 512): { map: THR
     bctx.putImageData(bimg, 0, 0);
   }
 
+  // wavy bands — sinusoidal edges for gas giants
+  if (spec.wavy) {
+    for (const w of spec.wavy) {
+      for (let pass = 0; pass < 2; pass++) {
+        const ctx = pass === 0 ? mctx : bctx;
+        const col = pass === 0 ? w.color : grayCss(70 + hexLum(w.color) * 130);
+        ctx.fillStyle = col;
+        ctx.beginPath();
+        const cy = w.y * height;
+        const ch = w.h * height;
+        const top = cy;
+        const bot = cy + ch;
+        ctx.moveTo(0, top);
+        for (let x = 0; x <= width; x += 4) {
+          ctx.lineTo(x, top + Math.sin(x * w.freq + w.y * 20) * w.amp);
+        }
+        for (let x = width; x >= 0; x -= 4) {
+          ctx.lineTo(x, bot + Math.sin(x * w.freq + 1.7 + w.y * 20) * w.amp);
+        }
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+  }
+
+  // swirl vortices — rotated ellipses for Jupiter storms etc.
+  if (spec.swirl) {
+    for (const s of spec.swirl) {
+      const cx = s.cx * width, cy = s.cy * height;
+      const sx = s.rx * width, sy = s.ry * height;
+      for (let pass = 0; pass < 2; pass++) {
+        const ctx = pass === 0 ? mctx : bctx;
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(s.rot);
+        const g = ctx.createRadialGradient(0, 0, 0, 0, 0, Math.max(sx, sy));
+        const col = pass === 0 ? s.color : grayCss(60 + hexLum(s.color) * 140);
+        g.addColorStop(0, col);
+        g.addColorStop(0.7, col);
+        g.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, sx, sy, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+  }
+
+  // polar caps — white/bright at high latitudes
+  if (spec.polarCaps) {
+    for (const pc of spec.polarCaps) {
+      for (let pass = 0; pass < 2; pass++) {
+        const ctx = pass === 0 ? mctx : bctx;
+        const col = pass === 0 ? pc.color : grayCss(220);
+        // top cap
+        const ty = pc.latitude * height;
+        const g1 = ctx.createLinearGradient(0, 0, 0, ty);
+        g1.addColorStop(0, col);
+        g1.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = g1;
+        ctx.fillRect(0, 0, width, ty);
+        // bottom cap
+        const by = (1 - pc.latitude) * height;
+        const g2 = ctx.createLinearGradient(0, by, 0, height);
+        g2.addColorStop(0, 'rgba(0,0,0,0)');
+        g2.addColorStop(1, col);
+        ctx.fillStyle = g2;
+        ctx.fillRect(0, by, width, height - by);
+      }
+    }
+  }
+
+  // spots — sunspots (dark core) or Great Red Spot (swirl)
+  if (spec.spots) {
+    for (const sp of spec.spots) {
+      for (let i = 0; i < sp.count; i++) {
+        const x = Math.random() * width;
+        const y = Math.random() * height;
+        const r = sp.size * (0.7 + Math.random() * 0.6);
+        // outer penumbra
+        const g = mctx.createRadialGradient(x, y, 0, x, y, r);
+        g.addColorStop(0, sp.core ?? sp.color);
+        g.addColorStop(0.55, sp.core ?? sp.color);
+        g.addColorStop(1, sp.color);
+        mctx.beginPath();
+        mctx.arc(x, y, r, 0, Math.PI * 2);
+        mctx.fillStyle = g;
+        mctx.fill();
+        // bump (sunspots are depressions)
+        const bg = bctx.createRadialGradient(x, y, 0, x, y, r);
+        bg.addColorStop(0, grayCss(30));
+        bg.addColorStop(0.6, grayCss(30));
+        bg.addColorStop(1, grayCss(baseLum));
+        bctx.beginPath();
+        bctx.arc(x, y, r, 0, Math.PI * 2);
+        bctx.fillStyle = bg;
+        bctx.fill();
+      }
+    }
+  }
+
+  // granulation — solar convection cells: bright tiles with dark boundaries
+  if (spec.granulation) {
+    const gSize = spec.granulation.size;
+    const gContrast = spec.granulation.contrast;
+    const cols = Math.ceil(width / gSize);
+    const rows = Math.ceil(height / gSize);
+    for (let gy = 0; gy < rows; gy++) {
+      for (let gx = 0; gx < cols; gx++) {
+        const cx = (gx + 0.5) * gSize + (Math.random() - 0.5) * gSize * 0.3;
+        const cy = (gy + 0.5) * gSize + (Math.random() - 0.5) * gSize * 0.3;
+        const r = gSize * (0.35 + Math.random() * 0.15);
+        const bright = 255 - Math.random() * 40;
+        const edge = 40 + Math.random() * 30;
+        const gg = mctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+        gg.addColorStop(0, `rgb(${bright},${bright - 10},${bright - 40})`);
+        gg.addColorStop(0.8, `rgb(${bright - 20},${bright - 30},${bright - 60})`);
+        gg.addColorStop(1, `rgba(${edge},${edge - 10},${edge - 20},${gContrast})`);
+        mctx.beginPath();
+        mctx.arc(cx, cy, r, 0, Math.PI * 2);
+        mctx.fillStyle = gg;
+        mctx.fill();
+        // bump
+        const bgg = bctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+        bgg.addColorStop(0, grayCss(120));
+        bgg.addColorStop(1, grayCss(60));
+        bctx.beginPath();
+        bctx.arc(cx, cy, r, 0, Math.PI * 2);
+        bctx.fillStyle = bgg;
+        bctx.fill();
+      }
+    }
+  }
+
+  // cloud layer — semi-transparent streaks (Earth clouds, Venus atmosphere)
+  if (spec.cloudLayer) {
+    for (const cl of spec.cloudLayer) {
+      mctx.globalAlpha = cl.opacity;
+      for (let i = 0; i < cl.count; i++) {
+        const x = Math.random() * width;
+        const y = Math.random() * height;
+        const rx = cl.size * (0.8 + Math.random() * 0.8);
+        const ry = rx * (0.15 + Math.random() * 0.15);
+        mctx.fillStyle = cl.color;
+        mctx.beginPath();
+        mctx.ellipse(x, y, rx, ry, Math.random() * 0.3, 0, Math.PI * 2);
+        mctx.fill();
+      }
+      mctx.globalAlpha = 1;
+    }
+  }
+
   const mapTex = new THREE.CanvasTexture(map);
   mapTex.colorSpace = THREE.SRGBColorSpace;
   mapTex.wrapS = THREE.RepeatWrapping;
@@ -190,21 +349,79 @@ function buildSurface(spec: SurfaceSpec, width = 1024, height = 512): { map: THR
   return { map: mapTex, bump: bumpTex };
 }
 
+// NASA-style Saturn ring texture: radial concentric ringlets painted onto a square
+// canvas so default planar RingGeometry UVs line up with real radius.
+function buildRingTexture(size = 1024): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d')!;
+  const img = ctx.createImageData(size, size);
+  const d = img.data;
+  const half = size / 2;
+  for (let py = 0; py < size; py++) {
+    const dy = (py - half) / half;
+    for (let px = 0; px < size; px++) {
+      const dx = (px - half) / half;
+      const t = Math.sqrt(dx * dx + dy * dy); // 0 center → 1 outer edge
+      const i = (py * size + px) * 4;
+      if (t >= 0.545 && t <= 0.985) {
+        let cr = 176, cg = 152, cb = 118, lum = 0.4;
+        if (t < 0.585) { // C ring — dim tan
+          cr = 150; cg = 133; cb = 115;
+          lum = 0.32;
+        } else if (t < 0.80) { // B ring — bright cream
+          cr = 228; cg = 201; cb = 160;
+          lum = 0.9;
+        } else if (t < 0.845) { // Cassini Division — near-black + hairline
+          cr = 214; cg = 199; cb = 184;
+          lum = 0.05;
+          if (t > 0.812 && t < 0.824) lum = 0.5;
+        } else if (t < 0.965) { // A ring — pale cool
+          cr = 214; cg = 197; cb = 178;
+          lum = 0.6;
+          if (t > 0.90 && t < 0.925) lum *= 0.38; // Encke Gap
+        } else { // outer fade
+          cr = 200; cg = 190; cb = 180;
+          lum = 0.5 * (1 - (t - 0.965) / 0.02);
+        }
+        lum *= 0.85 + 0.15 * Math.sin(t * 420); // fine ringlets
+        lum *= 0.92 + (Math.random() - 0.5) * 0.14; // grain
+        d[i] = cr * lum;
+        d[i + 1] = cg * lum;
+        d[i + 2] = cb * lum;
+        d[i + 3] = 255;
+      }
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.ClampToEdgeWrapping;
+  tex.anisotropy = MAX_ANISO;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+const RING_TEX = buildRingTexture(1024);
+
 const earth = buildSurface({
-  base: '#1f6fd0',
+  base: '#2f6fd0',
+  polarCaps: [{ color: '#ffffff', latitude: 0.1 }],
   blobs: [
-    { color: '#2f9e4f', count: 60, size: 34, squash: 0.5 },
-    { color: '#e8e4d0', count: 30, size: 20, squash: 0.4 },
-    { color: '#1a57a8', count: 34, size: 42, squash: 0.7 },
-    { color: '#3d7dd8', count: 20, size: 28, squash: 0.7 },
+    { color: '#1d4a8f', count: 20, size: 42, squash: 0.7 },
+    { color: '#3a7fe0', count: 18, size: 34, squash: 0.7 },
+    { color: '#2f9e4f', count: 55, size: 22, squash: 0.45 },
+    { color: '#4cae5e', count: 30, size: 12, squash: 0.5 },
+    { color: '#c9a25a', count: 18, size: 9, squash: 0.5 },
   ],
-  grain: 0.05,
+  cloudLayer: [{ color: 'rgba(255,255,255,0.85)', opacity: 0.7, count: 26, size: 40 }],
+  grain: 0.04,
 });
 const moonSurf = buildSurface({
   base: '#9a9a95',
   blobs: [
-    { color: '#6c6c68', count: 60, size: 12, squash: 0.6 },
+    { color: '#6f6f6a', count: 55, size: 14, squash: 0.6 },
     { color: '#c8c4ba', count: 30, size: 8, squash: 0.7 },
+    { color: '#8a867e', count: 14, size: 24, squash: 0.65 },
   ],
   craters: 70,
   grain: 0.12,
@@ -220,76 +437,98 @@ const mercury = buildSurface({
 });
 const venus = buildSurface({
   base: '#e3c37c',
-  bands: [
-    { color: '#dcb468', y: 0.1, h: 0.08 },
-    { color: '#f0d9a0', y: 0.25, h: 0.1 },
-    { color: '#e8c98a', y: 0.5, h: 0.22 },
-    { color: '#f2dba6', y: 0.8, h: 0.12 },
+  wavy: [
+    { color: '#dcb468', y: 0.08, h: 0.1, amp: 3, freq: 0.06 },
+    { color: '#f0d9a0', y: 0.22, h: 0.12, amp: 4, freq: 0.07 },
+    { color: '#e8c98a', y: 0.42, h: 0.16, amp: 4, freq: 0.06 },
+    { color: '#f2dba6', y: 0.62, h: 0.12, amp: 3, freq: 0.07 },
+    { color: '#e5c98c', y: 0.8, h: 0.14, amp: 3, freq: 0.06 },
   ],
-  blobs: [{ color: '#fbe7bd', count: 26, size: 16, squash: 0.7 }],
-  grain: 0.05,
+  swirl: [{ color: '#f7e8c4', cx: 0.4, cy: 0.3, rx: 0.12, ry: 0.06, rot: -0.25 }],
+  blobs: [{ color: '#fbe7bd', count: 22, size: 18, squash: 0.6 }],
+  grain: 0.04,
 });
 const mars = buildSurface({
   base: '#c95b2e',
+  polarCaps: [{ color: '#f2ece4', latitude: 0.06 }],
   blobs: [
     { color: '#8f3a1e', count: 26, size: 26, squash: 0.6 },
     { color: '#b8492c', count: 20, size: 18, squash: 0.7 },
     { color: '#e8a173', count: 12, size: 10, squash: 0.6 },
+    { color: '#7a3016', count: 6, size: 30, squash: 0.5 },
+    { color: '#3f1a0c', count: 8, size: 4, squash: 1 },
   ],
   craters: 40,
   grain: 0.1,
 });
 const jupiter = buildSurface({
   base: '#dcc08a',
-  bands: [
-    { color: '#c9c2b0', y: 0.04, h: 0.05 },
-    { color: '#b97b3c', y: 0.15, h: 0.09 },
-    { color: '#efe2c0', y: 0.29, h: 0.17 },
-    { color: '#c9884a', y: 0.5, h: 0.11 },
-    { color: '#efe2c0', y: 0.65, h: 0.15 },
-    { color: '#b97b3c', y: 0.84, h: 0.09 },
-    { color: '#8a5a2c', y: 0.95, h: 0.05 },
+  wavy: [
+    { color: '#c9c2b0', y: 0.02, h: 0.05, amp: 3, freq: 0.04 },
+    { color: '#b97b3c', y: 0.13, h: 0.09, amp: 4, freq: 0.05 },
+    { color: '#6f4a24', y: 0.27, h: 0.05, amp: 3, freq: 0.03 },
+    { color: '#efe2c0', y: 0.36, h: 0.12, amp: 4, freq: 0.045 },
+    { color: '#c9884a', y: 0.52, h: 0.09, amp: 4, freq: 0.05 },
+    { color: '#99a0a8', y: 0.64, h: 0.05, amp: 3, freq: 0.03 },
+    { color: '#efe2c0', y: 0.72, h: 0.12, amp: 4, freq: 0.05 },
+    { color: '#b97b3c', y: 0.87, h: 0.08, amp: 3, freq: 0.04 },
   ],
-  blobs: [{ color: '#e8d8b0', count: 40, size: 9, squash: 0.18 }],
-  grain: 0.03,
+  swirl: [
+    { color: '#d9703c', cx: 0.72, cy: 0.62, rx: 0.08, ry: 0.05, rot: 0.08 },
+    { color: '#b3552e', cx: 0.2, cy: 0.28, rx: 0.05, ry: 0.03, rot: -0.1 },
+    { color: '#c98a5a', cx: 0.5, cy: 0.5, rx: 0.05, ry: 0.025, rot: 0.15 },
+    { color: '#9a6a40', cx: 0.85, cy: 0.32, rx: 0.04, ry: 0.02, rot: -0.05 },
+  ],
+  blobs: [{ color: '#e8d8b0', count: 60, size: 8, squash: 0.2 }],
+  grain: 0.025,
 });
 const saturn = buildSurface({
   base: '#e6cf9a',
-  bands: [
-    { color: '#d9bd86', y: 0.08, h: 0.09 },
-    { color: '#f2e7c8', y: 0.24, h: 0.13 },
-    { color: '#c9a86a', y: 0.5, h: 0.22 },
-    { color: '#f2e7c8', y: 0.78, h: 0.13 },
-    { color: '#c9a86a', y: 0.92, h: 0.08 },
+  wavy: [
+    { color: '#d9bd86', y: 0.06, h: 0.08, amp: 2, freq: 0.04 },
+    { color: '#f2e7c8', y: 0.2, h: 0.15, amp: 2, freq: 0.035 },
+    { color: '#c9a86a', y: 0.42, h: 0.16, amp: 2.5, freq: 0.04 },
+    { color: '#f2e7c8', y: 0.62, h: 0.16, amp: 2, freq: 0.04 },
+    { color: '#c9a86a', y: 0.82, h: 0.12, amp: 2, freq: 0.035 },
+    { color: '#dfc89a', y: 0.94, h: 0.05, amp: 1.5, freq: 0.03 },
   ],
-  grain: 0.04,
+  blobs: [{ color: '#f7edd2', count: 16, size: 12, squash: 0.3 }],
+  grain: 0.03,
 });
 const uranus = buildSurface({
   base: '#9fd9dd',
-  blobs: [
-    { color: '#8ecfd4', count: 10, size: 30, squash: 0.6 },
-    { color: '#b3e4e6', count: 10, size: 16, squash: 0.7 },
+  wavy: [
+    { color: '#92cdd3', y: 0.3, h: 0.12, amp: 2, freq: 0.04 },
+    { color: '#b0e6e8', y: 0.55, h: 0.1, amp: 1.5, freq: 0.045 },
+    { color: '#8ec6cc', y: 0.74, h: 0.1, amp: 2, freq: 0.04 },
   ],
-  grain: 0.02,
+  blobs: [{ color: '#b3e4e6', count: 8, size: 20, squash: 0.6 }],
+  grain: 0.015,
 });
 const neptune = buildSurface({
   base: '#3a6cff',
-  bands: [
-    { color: '#3160e8', y: 0.18, h: 0.12 },
-    { color: '#4a7bff', y: 0.5, h: 0.2 },
-    { color: '#2d58d8', y: 0.8, h: 0.12 },
+  wavy: [
+    { color: '#3160e8', y: 0.18, h: 0.14, amp: 3, freq: 0.05 },
+    { color: '#4a7bff', y: 0.4, h: 0.18, amp: 4, freq: 0.06 },
+    { color: '#2d58d8', y: 0.62, h: 0.14, amp: 3, freq: 0.05 },
+    { color: '#5388ff', y: 0.82, h: 0.1, amp: 2.5, freq: 0.045 },
   ],
-  blobs: [{ color: '#7fc0ff', count: 12, size: 10, squash: 0.5 }],
-  grain: 0.04,
+  swirl: [{ color: '#1d3f9e', cx: 0.45, cy: 0.62, rx: 0.07, ry: 0.04, rot: 0.1 }],
+  blobs: [{ color: '#7fc0ff', count: 16, size: 9, squash: 0.4 }],
+  grain: 0.03,
 });
 const sunSurf = buildSurface({
-  base: '#ffc24d',
-  blobs: [
-    { color: '#ff8f1f', count: 240, size: 14, squash: 0.8 },
-    { color: '#ffe08a', count: 180, size: 8, squash: 0.8 },
-    { color: '#ffb04d', count: 140, size: 22, squash: 0.9 },
+  base: '#ffb53d',
+  granulation: { size: 12, contrast: 0.5 },
+  spots: [
+    { color: '#ff8f1f', count: 10, size: 22, core: '#4a2508' },
+    { color: '#ff9f3f', count: 6, size: 12, core: '#3a2008' },
   ],
-  grain: 0.1,
+  blobs: [
+    { color: '#ffe08a', count: 200, size: 9, squash: 0.9 },
+    { color: '#ff9f30', count: 120, size: 16, squash: 0.9 },
+  ],
+  grain: 0.06,
 });
 
 const SURF: Record<string, { map: THREE.CanvasTexture; bump: THREE.CanvasTexture }> = {
@@ -353,6 +592,9 @@ interface PlanetSpec {
   tilt: number;
   color: number;
   ring?: boolean;
+  ringOpacity?: number;
+  ringInner?: number;
+  ringOuter?: number;
   bumpScale: number;
   phase: number;
 }
@@ -370,8 +612,8 @@ const PLANETS: PlanetSpec[] = [
   { name: 'Mars', radius: 0.46, orbit: 11.6, speed: 0, rotSpeed: 0.06, tilt: 0.44, color: 0xffffff, bumpScale: 0.7, phase: 5.3 },
   { name: 'Jupiter', radius: 1.55, orbit: 15.4, speed: 0, rotSpeed: 0.18, tilt: 0.05, color: 0xffffff, bumpScale: 0.3, phase: 1.9 },
   { name: 'Saturn', radius: 1.35, orbit: 19.6, speed: 0, rotSpeed: 0.16, tilt: 0.47, color: 0xffffff, ring: true, bumpScale: 0.3, phase: 3.4 },
-  { name: 'Uranus', radius: 0.95, orbit: 23.6, speed: 0, rotSpeed: 0.05, tilt: 1.71, color: 0x9fd9dd, bumpScale: 0.15, phase: 0.3 },
-  { name: 'Neptune', radius: 0.9, orbit: 27.6, speed: 0, rotSpeed: 0.05, tilt: 0.5, color: 0x3a6cff, bumpScale: 0.25, phase: 2.1 },
+  { name: 'Uranus', radius: 0.95, orbit: 23.6, speed: 0, rotSpeed: 0.05, tilt: 1.71, color: 0x9fd9dd, ring: true, ringOpacity: 0.45, ringInner: 1.6, ringOuter: 2.0, bumpScale: 0.15, phase: 0.3 },
+  { name: 'Neptune', radius: 0.9, orbit: 27.6, speed: 0, rotSpeed: 0.05, tilt: 0.5, color: 0x3a6cff, ring: true, ringOpacity: 0.35, ringInner: 1.45, ringOuter: 1.85, bumpScale: 0.25, phase: 2.1 },
 ];
 for (const s of PLANETS) {
   s.speed = EARTH_SPEED * Math.pow(EARTH_ORBIT / s.orbit, 1.5);
@@ -448,25 +690,15 @@ for (const spec of PLANETS) {
   };
 
   if (spec.ring) {
-    const inner = spec.radius * 1.3;
-    const outer = spec.radius * 2.4;
-    const ringSurf = buildSurface({
-      base: '#cbb183',
-      bands: [
-        { color: '#e8ddc0', y: 0.2, h: 0.1 },
-        { color: '#a8885f', y: 0.45, h: 0.12 },
-        { color: '#b9a077', y: 0.7, h: 0.1 },
-        { color: '#d9c49a', y: 0.9, h: 0.08 },
-      ],
-      grain: 0.06,
-    }, 1024, 64);
+    const inner = spec.radius * (spec.ringInner ?? 1.3);
+    const outer = spec.radius * (spec.ringOuter ?? 2.4);
     const ring = new THREE.Mesh(
       new THREE.RingGeometry(inner, outer, 128, 8),
       new THREE.MeshStandardMaterial({
-        map: ringSurf.map,
+        map: RING_TEX,
         side: THREE.DoubleSide,
         transparent: true,
-        opacity: 0.95,
+        opacity: spec.ringOpacity ?? 0.95,
         roughness: 0.8,
         color: 0xffffff,
       }),
@@ -1678,7 +1910,7 @@ const controlsEl = document.getElementById('controls') as HTMLDivElement;
 btn('panelbtn').addEventListener('click', () => {
   const hidden = controlsEl.style.display === 'none';
   controlsEl.style.display = hidden ? '' : 'none';
-  btn('panelbtn').textContent = hidden ? '✕ Ẩn' : '☰ Hiện';
+  btn('panelbtn').textContent = hidden ? '✕ Ẩn' : '☰ Hiện bảng điều khiển';
   btn('panelbtn').classList.toggle('off', hidden);
 });
 
