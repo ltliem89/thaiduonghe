@@ -23101,6 +23101,7 @@ void main() {
   var SOLAR_FIT_T = distToT(SOLAR_FIT_DIST);
   var flightTarget = null;
   var snapArmed = true;
+  var sunFocus = false;
   var hashZ = /#z=([\d.+-eE]+)/.exec(location.hash);
   if (hashZ) {
     const v = MathUtils.clamp(parseFloat(hashZ[1]), ZOOM_MIN, ZOOM_MAX);
@@ -23217,6 +23218,11 @@ void main() {
     const speedMul = d >= 1 ? 1 : d <= SOLAR_FIT_DIST ? 0.2 : 1 - 0.8 * (Math.log10(d) - 0) / (Math.log10(SOLAR_FIT_DIST) - 0);
     zoomT = MathUtils.clamp(zoomT + e.deltaY * 6e-4 * Math.max(0.2, speedMul), 0, 1);
     let dist = tToDist(zoomT);
+    const floorDist = selectedPivot || sunFocus ? ZOOM_MIN : SOLAR_FIT_DIST;
+    if (dist < floorDist) {
+      dist = floorDist;
+      zoomT = distToT(floorDist);
+    }
     const lgD = Math.log10(dist);
     const lgFit = Math.log10(SOLAR_FIT_DIST);
     const band = 0.09;
@@ -23265,6 +23271,7 @@ void main() {
     }
     if (v === "Sun") {
       deselectPlanet();
+      sunFocus = true;
       flightTarget = SUN_ANCHOR.clone();
       camState.targetDist = SOLAR_FIT_DIST * 0.5;
       zoomT = distToT(SOLAR_FIT_DIST * 0.5);
@@ -23444,6 +23451,7 @@ void main() {
   function deselectPlanet() {
     selectedPlanet = null;
     selectedPivot = null;
+    sunFocus = false;
     clearHover();
     infoPanel.style.display = "none";
     planetSelect.value = "";

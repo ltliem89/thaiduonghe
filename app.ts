@@ -1510,6 +1510,8 @@ const SOLAR_FIT_DIST = 0.17;
 const SOLAR_FIT_T = distToT(SOLAR_FIT_DIST);
 let flightTarget: THREE.Vector3 | null = null;
 let snapArmed = true;
+// true only after explicitly choosing "Mặt Trời": wheel may then fly in close
+let sunFocus = false;
 
 // optional deep-view start: open e.g. ...?#z=1e5 to begin zoomed at that dist
 const hashZ = /#z=([\d.+-eE]+)/.exec(location.hash);
@@ -1642,6 +1644,13 @@ canvas.addEventListener('wheel', (e: WheelEvent) => {
     1 - 0.8 * (Math.log10(d) - 0) / (Math.log10(SOLAR_FIT_DIST) - 0);
   zoomT = THREE.MathUtils.clamp(zoomT + e.deltaY * 0.0006 * Math.max(0.2, speedMul), 0, 1);
   let dist = tToDist(zoomT);
+  // hard stop at the full-solar-system framing: can't wheel deeper into the
+  // Sun unless a planet/sun is explicitly followed (selectPlanet/sunFocus)
+  const floorDist = selectedPivot || sunFocus ? ZOOM_MIN : SOLAR_FIT_DIST;
+  if (dist < floorDist) {
+    dist = floorDist;
+    zoomT = distToT(floorDist);
+  }
   // magnetic "detent": scrolling near the full-solar-system framing snaps to
   // it and nudges the view back to the Sun (re-arms only after leaving the band)
   const lgD = Math.log10(dist);
@@ -1688,6 +1697,7 @@ planetSelect.addEventListener('change', () => {
   if (!v) { deselectPlanet(); return; }
   if (v === 'Sun') {
     deselectPlanet();
+    sunFocus = true;
     flightTarget = SUN_ANCHOR.clone();
     camState.targetDist = SOLAR_FIT_DIST * 0.5;
     zoomT = distToT(SOLAR_FIT_DIST * 0.5);
@@ -1880,6 +1890,7 @@ function selectPlanet(mesh: THREE.Mesh): void {
 function deselectPlanet(): void {
   selectedPlanet = null;
   selectedPivot = null;
+  sunFocus = false;
   clearHover();
   infoPanel.style.display = 'none';
   planetSelect.value = '';
