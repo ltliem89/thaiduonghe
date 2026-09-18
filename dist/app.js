@@ -23240,6 +23240,13 @@ void main() {
   var clockStop = document.getElementById("clockstop");
   var clockAstro = document.getElementById("clockastro");
   var levelInfo = document.getElementById("levelinfo");
+  var controlsEl = document.getElementById("controls");
+  btn("panelbtn").addEventListener("click", () => {
+    const hidden = controlsEl.style.display === "none";
+    controlsEl.style.display = hidden ? "" : "none";
+    btn("panelbtn").textContent = hidden ? "\u2715 \u1EA8n" : "\u2630 Hi\u1EC7n";
+    btn("panelbtn").classList.toggle("off", hidden);
+  });
   var planetSelect = document.getElementById("planetselect");
   var chaseName = document.getElementById("chasename");
   var PLANET_VI = {

@@ -8,6 +8,13 @@
     * { margin:0; padding:0; box-sizing:border-box; }
     html,body { width:100%; height:100%; background:#05060c; font:14px/1 system-ui,sans-serif; color:#dfe4ee; overflow:hidden; }
     canvas#scene { display:block; width:100vw; height:100vh; touch-action:none; }
+    #panelbtn {
+      position:fixed; top:16px; right:254px; background:#151a26; border:1px solid #2c3444;
+      color:#cbd4e2; padding:7px 10px; border-radius:6px; font:inherit; font-size:13px;
+      cursor:pointer; z-index:3; line-height:1; transition:right .15s;
+    }
+    #panelbtn:hover { background:#2c3444; color:#fff; }
+    #panelbtn.off { right:16px; }
     #controls {
       position:fixed; top:16px; right:16px; background:rgba(8,10,18,.6);
       backdrop-filter:blur(6px); padding:12px; border-radius:10px;
@@ -91,6 +98,7 @@
     <span id="infoname"></span>
     <div id="infolines"></div>
   </div>
+  <button id="panelbtn" title="Ẩn/hiện bảng điều khiển">✕ Ẩn</button>
   <div id="controls">
     <div id="simclock">
       <span id="clockstop">00:00:00</span>

@@ -1674,6 +1674,14 @@ const clockStop = document.getElementById('clockstop') as HTMLSpanElement;
 const clockAstro = document.getElementById('clockastro') as HTMLSpanElement;
 const levelInfo = document.getElementById('levelinfo') as HTMLSpanElement;
 
+const controlsEl = document.getElementById('controls') as HTMLDivElement;
+btn('panelbtn').addEventListener('click', () => {
+  const hidden = controlsEl.style.display === 'none';
+  controlsEl.style.display = hidden ? '' : 'none';
+  btn('panelbtn').textContent = hidden ? '✕ Ẩn' : '☰ Hiện';
+  btn('panelbtn').classList.toggle('off', hidden);
+});
+
 const planetSelect = document.getElementById('planetselect') as HTMLSelectElement;
 const chaseName = document.getElementById('chasename') as HTMLSpanElement;
 const PLANET_VI: Record<string, string> = {
