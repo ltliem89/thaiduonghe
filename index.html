@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <title>Cosmic Zoom — Thái Dương Hệ → Vũ Trụ</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    html,body { width:100%; height:100%; background:#05060c; font:14px/1 system-ui,sans-serif; color:#dfe4ee; overflow:hidden; }
+    canvas#scene { display:block; width:100vw; height:100vh; touch-action:none; }
+    #controls {
+      position:fixed; top:16px; right:16px; background:rgba(8,10,18,.6);
+      backdrop-filter:blur(6px); padding:12px; border-radius:10px;
+      display:grid; grid-template-columns:1fr 1fr; gap:8px; width:220px; z-index:2;
+    }
+    #controls button {
+      background:#151a26; border:1px solid #2c3444; color:#cbd4e2;
+      padding:7px 8px; border-radius:6px; font:inherit; cursor:pointer;
+      transition: background .15s;
+    }
+    #controls button:hover { background:#2c3444; color:#fff; }
+    #controls button.act { background:#314a75; border-color:#5a86c4; color:#fff; }
+    #chasewrap { grid-column:1/3; display:flex; flex-direction:column; gap:3px; }
+    #chasewrap label { font-size:11px; color:#7c8698; display:flex; justify-content:space-between; }
+    #chasewrap select {
+      width:100%; background:#11151f; border:1px solid #2c3444; color:#cbd4e2;
+      padding:6px 6px; border-radius:6px; font:inherit; cursor:pointer; outline:none;
+    }
+    #chasewrap select:focus { border-color:#5a86c4; }
+    #planinfo {
+      position:fixed; top:16px; left:16px; background:rgba(8,10,18,.68);
+      backdrop-filter:blur(6px); padding:12px 14px; border-radius:10px;
+      border:1px solid #2c3444; display:none; z-index:2; min-width:190px;
+    }
+    #infoname { display:block; font-size:16px; font-weight:600; color:#ffd07a; margin-bottom:6px; }
+    #infolines { font-size:12px; color:#9fb0cd; line-height:1.7; white-space:pre-line; }
+    #simclock {
+      grid-column:1/3; display:flex; flex-direction:column; align-items:center; gap:3px;
+      background:#0a0e18; border:1px solid #2c3444; border-radius:8px; padding:8px 6px;
+      font-variant-numeric:tabular-nums;
+    }
+    #clockstop {
+      font-size:22px; font-weight:600; color:#7ec8ff; letter-spacing:1px;
+      font-family:ui-monospace,Consolas,monospace; line-height:1;
+    }
+    #clockastro { font-size:10px; color:#8fa0bd; }
+    #levelinfo {
+      margin-top:3px; font-size:10px; color:#ffc98a; letter-spacing:.2px;
+      text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;
+    }
+    #timeline {
+      grid-column:1/3; display:flex; flex-direction:column; gap:4px;
+      padding:6px 2px 2px;
+    }
+    #timeline label {
+      font-size:11px; color:#7c8698; display:flex; justify-content:space-between;
+    }
+    #timeline label span { color:#ffd07a; }
+    #timescale {
+      width:100%; accent-color:#ffb03a; cursor:pointer;
+    }
+    #presets { display:grid; grid-template-columns:repeat(4,1fr); gap:5px; }
+    #presets button {
+      background:#11151f; border:1px solid #2c3444; color:#aeb8ca;
+      padding:4px 0; border-radius:5px; font-size:11px; cursor:pointer;
+      transition: background .15s;
+    }
+    #presets button:hover { background:#37415a; color:#fff; }
+    #scaleinfo {
+      font-size:10px; color:#66738c; text-align:center; padding-top:2px;
+      font-variant-numeric:tabular-nums;
+    }
+    #labels { position:fixed; inset:0; overflow:hidden; z-index:1; pointer-events:none; }
+    #title {
+      position:fixed; bottom:14px; left:14px; color:#5c6474; font-size:12px;
+      line-height:1.5; z-index:2; pointer-events:none; max-width:440px;
+    }
+    #title b { color:#aab4c2; font-weight:500; }
+    #title .kepler { color:#7b879b; }
+    #error {
+      position:fixed; inset:0; background:#1a0505; color:#ffa0a0; padding:40px;
+      font:16px/1.6 monospace; z-index:999; display:none; white-space:pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <div id="error"></div>
+  <canvas id="scene"></canvas>
+  <div id="labels"></div>
+  <div id="planinfo">
+    <span id="infoname"></span>
+    <div id="infolines"></div>
+  </div>
+  <div id="controls">
+    <div id="simclock">
+      <span id="clockstop">00:00:00</span>
+      <span id="clockastro">T+ 0.0 ngày · 0.0 năm</span>
+      <span id="levelinfo">Cấp 0 · Hệ Mặt Trời</span>
+    </div>
+    <button id="pan">Bàn tay: OFF</button>
+    <button id="pause">Pause</button>
+    <button id="turntable">Turntable: ON</button>
+    <button id="bloom">Glow: ON</button>
+    <button id="house" style="grid-column:1/3">⌂ Hệ Mặt Trời (Full)</button>
+    <div id="chasewrap">
+      <label for="planetselect">Bám theo hành tinh <span id="chasename">—</span></label>
+      <select id="planetselect">
+        <option value="">— Chọn hành tinh —</option>
+        <option value="Sun">Mặt Trời</option>
+        <option value="Mercury">Sao Thủy (Mercury)</option>
+        <option value="Venus">Sao Kim (Venus)</option>
+        <option value="Earth">Trái Đất (Earth)</option>
+        <option value="Moon">Mặt Trăng (Moon)</option>
+        <option value="Mars">Sao Hỏa (Mars)</option>
+        <option value="Jupiter">Sao Mộc (Jupiter)</option>
+        <option value="Saturn">Sao Thổ (Saturn)</option>
+        <option value="Uranus">Sao Thiên Vương (Uranus)</option>
+        <option value="Neptune">Sao Hải Vương (Neptune)</option>
+      </select>
+    </div>
+    <button id="universe">Vũ trụ: ON</button>
+    <button id="belt">Belt: ON</button>
+    <button id="orbits" style="grid-column:1/3">Orbits: ON</button>
+    <div id="timeline">
+      <label for="timescale">Tốc độ trôi thời gian <span id="timevalue">1x</span></label>
+      <input id="timescale" type="range" min="0" max="5" step="0.01" value="1" />
+      <div id="presets">
+        <button data-scale="0">0x</button>
+        <button data-scale="0.5">0.5x</button>
+        <button data-scale="1">1x</button>
+        <button data-scale="2">2x</button>
+        <button data-scale="3">3x</button>
+        <button data-scale="4">4x</button>
+        <button data-scale="5">5x</button>
+      </div>
+      <div id="scaleinfo">1x = 58.1 ngày mô phỏng / giây thực · 1 năm = 6.3 giây</div>
+    </div>
+    <button id="shot" style="grid-column:1/3">Screenshot PNG</button>
+  </div>
+  <div id="title">
+    <b>Cosmic Zoom — từ Hệ Mặt Trời tới Vũ trụ quan sát được</b><br />
+    Lăn chuột ra xa: Hệ Mặt Trời → Liên sao → Nhánh Orion → Ngân Hà → Nhóm Địa phương →<br />
+    Siêu đám Xử Nữ → Laniakea → Cosmic Web → CMBR (93 tỷ năm ánh sáng)<br />
+    Lăn chuột tới khung toàn Hệ Mặt Trời sẽ tự khớp (gờ) về ⌂ · Nút ⌂ Hệ Mặt Trời (Full) để về nhanh<br />
+    Rê chuột quay · Chuột phải kéo (hoặc Bàn tay) để dời · Nhấp hành tinh để bay tới
+  </div>
+  <script type="module" src="dist/app.js"></script>
+  <script>
+    window.addEventListener('error', e => {
+      const d = document.getElementById('error');
+      d.style.display = 'block';
+      d.textContent += e.message + '\n' + (e.filename || '') + ':' + (e.lineno || '');
+    });
+  </script>
+</body>
+</html>
