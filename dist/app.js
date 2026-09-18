@@ -23702,28 +23702,30 @@ void main() {
   var simSeconds = 0;
   var beltAngle = 0;
   var moonAngle = 1.2;
+  var DAYS_PER_SEC = 30;
+  var SIM_RATE = Math.PI * 2 / 365.25 * DAYS_PER_SEC;
   renderer.setAnimationLoop(() => {
     const dt = Math.min(paused ? 0 : clock.getDelta(), 0.1);
-    elapsed += dt * timeScale;
+    elapsed += dt * timeScale * SIM_RATE;
     if (timeScale > 0) simSeconds += dt * timeScale;
     const cs = Math.floor(simSeconds);
     clockStop.textContent = `${String(Math.floor(cs / 3600)).padStart(2, "0")}:${String(Math.floor(cs % 3600 / 60)).padStart(2, "0")}:${String(cs % 60).padStart(2, "0")}`;
     const totalDays = elapsed / (Math.PI * 2) * 365.25;
     clockAstro.textContent = `T+ ${totalDays.toFixed(1)} ng\xE0y \xB7 ${(totalDays / 365.25).toFixed(1)} n\u0103m`;
-    sun.rotation.y += dt * timeScale * 0.02;
+    sun.rotation.y += dt * timeScale * SIM_RATE * 0.02;
     const pulse = 1 + 0.02 * Math.sin(elapsed * 2.2);
     glow.scale.setScalar(11 * pulse);
     for (const { pivot, mesh, spec, moon } of planets) {
       const a = spec.phase + elapsed * spec.speed;
       pivot.position.set(Math.cos(a) * spec.orbit, 0, Math.sin(a) * spec.orbit);
-      mesh.rotation.y += dt * timeScale * spec.rotSpeed;
+      mesh.rotation.y += dt * timeScale * SIM_RATE * spec.rotSpeed;
       if (moon) {
-        moonAngle = (moonAngle + dt * timeScale * EARTH_SPEED * MOON_ORBITS_PER_EARTH_YEAR) % (Math.PI * 2);
+        moonAngle = (moonAngle + dt * timeScale * SIM_RATE * EARTH_SPEED * MOON_ORBITS_PER_EARTH_YEAR) % (Math.PI * 2);
         moon.position.set(Math.cos(moonAngle) * MOON_ORBIT_DIST, 0, Math.sin(moonAngle) * MOON_ORBIT_DIST);
-        moon.rotation.y += dt * timeScale * 0.05;
+        moon.rotation.y += dt * timeScale * SIM_RATE * 0.05;
       }
     }
-    beltAngle += dt * timeScale * 7e-3;
+    beltAngle += dt * timeScale * SIM_RATE * 7e-3;
     belt.rotation.y = beltAngle;
     integrateCamera(dt);
     updateCosmosLabels();
