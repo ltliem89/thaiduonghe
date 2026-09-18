@@ -1980,6 +1980,7 @@ planetSelect.addEventListener('change', () => {
 
 const timeSlider = input('timescale');
 const timeValue = document.getElementById('timevalue') as HTMLSpanElement;
+const scaleInfo = document.getElementById('scaleinfo') as HTMLSpanElement;
 let timeScale = parseFloat(timeSlider.value) || 1;
 setTimeScale(timeScale);
 
@@ -1987,6 +1988,8 @@ function setTimeScale(v: number): void {
   timeSlider.value = String(v);
   timeScale = v;
   timeValue.textContent = `${v.toFixed(2).replace(/\.?0+$/, '')}x`;
+  const dps = v * DAYS_PER_SEC;
+  scaleInfo.textContent = `${timeValue.textContent} = ${dps.toFixed(1)} ngày mô phỏng / giây thực · 1 năm ≈ ${(365.25 / dps).toFixed(0)} giây`;
 }
 timeSlider.addEventListener('input', () => {
   setTimeScale(parseFloat(timeSlider.value) || 0);
@@ -1998,11 +2001,11 @@ document.querySelectorAll<HTMLButtonElement>('button[data-scale]').forEach(b => 
 let paused = false;
 btn('pause').addEventListener('click', () => {
   paused = !paused;
-  btn('pause').textContent = paused ? 'Play' : 'Pause';
+  btn('pause').textContent = paused ? 'Tiếp tục' : 'Tạm dừng';
 });
 btn('turntable').addEventListener('click', () => {
   camState.autoRotate = !camState.autoRotate;
-  btn('turntable').textContent = camState.autoRotate ? 'Turntable: ON' : 'Turntable: OFF';
+  btn('turntable').textContent = camState.autoRotate ? 'Xoay màn hình: BẬT' : 'Xoay màn hình: TẮT';
 });
 let orbitBoost = false;
 btn('orbits').addEventListener('click', () => {
@@ -2016,15 +2019,15 @@ btn('orbits').addEventListener('click', () => {
 });
 btn('belt').addEventListener('click', () => {
   belt.visible = !belt.visible;
-  btn('belt').textContent = belt.visible ? 'Belt: ON' : 'Belt: OFF';
+  btn('belt').textContent = belt.visible ? 'Vành đai: BẬT' : 'Vành đai: TẮT';
 });
 btn('bloom').addEventListener('click', () => {
   composer.enabled = !composer.enabled;
-  btn('bloom').textContent = composer.enabled ? 'Glow: ON' : 'Glow: OFF';
+  btn('bloom').textContent = composer.enabled ? 'Bừng sáng: BẬT' : 'Bừng sáng: TẮT';
 });
 btn('universe').addEventListener('click', () => {
   cosmosOn = !cosmosOn;
-  btn('universe').textContent = cosmosOn ? 'Vũ trụ: ON' : 'Vũ trụ: OFF';
+  btn('universe').textContent = cosmosOn ? 'Vũ trụ: BẬT' : 'Vũ trụ: TẮT';
   if (!cosmosOn) deselectPlanet();
 });
 btn('pan').addEventListener('click', () => {
@@ -2179,7 +2182,7 @@ let beltAngle = 0;
 let moonAngle = 1.2;
 // 1× timeScale = DAYS_PER_SEC simulated days per real second. Elapsed sim
 // angle rate: one Earth orbit (2π) = 365.25 days → 2π/365.25 rad per day.
-const DAYS_PER_SEC = 30;
+const DAYS_PER_SEC = 15;
 const SIM_RATE = (Math.PI * 2) / 365.25 * DAYS_PER_SEC;
 
 renderer.setAnimationLoop(() => {

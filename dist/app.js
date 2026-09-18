@@ -23524,12 +23524,15 @@ void main() {
   });
   var timeSlider = input("timescale");
   var timeValue = document.getElementById("timevalue");
+  var scaleInfo = document.getElementById("scaleinfo");
   var timeScale = parseFloat(timeSlider.value) || 1;
   setTimeScale(timeScale);
   function setTimeScale(v) {
     timeSlider.value = String(v);
     timeScale = v;
     timeValue.textContent = `${v.toFixed(2).replace(/\.?0+$/, "")}x`;
+    const dps = v * DAYS_PER_SEC;
+    scaleInfo.textContent = `${timeValue.textContent} = ${dps.toFixed(1)} ng\xE0y m\xF4 ph\u1ECFng / gi\xE2y th\u1EF1c \xB7 1 n\u0103m \u2248 ${(365.25 / dps).toFixed(0)} gi\xE2y`;
   }
   timeSlider.addEventListener("input", () => {
     setTimeScale(parseFloat(timeSlider.value) || 0);
@@ -23540,11 +23543,11 @@ void main() {
   var paused = false;
   btn("pause").addEventListener("click", () => {
     paused = !paused;
-    btn("pause").textContent = paused ? "Play" : "Pause";
+    btn("pause").textContent = paused ? "Ti\u1EBFp t\u1EE5c" : "T\u1EA1m d\u1EEBng";
   });
   btn("turntable").addEventListener("click", () => {
     camState.autoRotate = !camState.autoRotate;
-    btn("turntable").textContent = camState.autoRotate ? "Turntable: ON" : "Turntable: OFF";
+    btn("turntable").textContent = camState.autoRotate ? "Xoay m\xE0n h\xECnh: B\u1EACT" : "Xoay m\xE0n h\xECnh: T\u1EAET";
   });
   var orbitBoost = false;
   btn("orbits").addEventListener("click", () => {
@@ -23558,15 +23561,15 @@ void main() {
   });
   btn("belt").addEventListener("click", () => {
     belt.visible = !belt.visible;
-    btn("belt").textContent = belt.visible ? "Belt: ON" : "Belt: OFF";
+    btn("belt").textContent = belt.visible ? "V\xE0nh \u0111ai: B\u1EACT" : "V\xE0nh \u0111ai: T\u1EAET";
   });
   btn("bloom").addEventListener("click", () => {
     composer.enabled = !composer.enabled;
-    btn("bloom").textContent = composer.enabled ? "Glow: ON" : "Glow: OFF";
+    btn("bloom").textContent = composer.enabled ? "B\u1EEBng s\xE1ng: B\u1EACT" : "B\u1EEBng s\xE1ng: T\u1EAET";
   });
   btn("universe").addEventListener("click", () => {
     cosmosOn = !cosmosOn;
-    btn("universe").textContent = cosmosOn ? "V\u0169 tr\u1EE5: ON" : "V\u0169 tr\u1EE5: OFF";
+    btn("universe").textContent = cosmosOn ? "V\u0169 tr\u1EE5: B\u1EACT" : "V\u0169 tr\u1EE5: T\u1EAET";
     if (!cosmosOn) deselectPlanet();
   });
   btn("pan").addEventListener("click", () => {
@@ -23702,7 +23705,7 @@ void main() {
   var simSeconds = 0;
   var beltAngle = 0;
   var moonAngle = 1.2;
-  var DAYS_PER_SEC = 30;
+  var DAYS_PER_SEC = 15;
   var SIM_RATE = Math.PI * 2 / 365.25 * DAYS_PER_SEC;
   renderer.setAnimationLoop(() => {
     const dt = Math.min(paused ? 0 : clock.getDelta(), 0.1);
