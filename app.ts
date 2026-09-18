@@ -1967,9 +1967,14 @@ btn('turntable').addEventListener('click', () => {
   camState.autoRotate = !camState.autoRotate;
   btn('turntable').textContent = camState.autoRotate ? 'Turntable: ON' : 'Turntable: OFF';
 });
+let orbitBoost = false;
 btn('orbits').addEventListener('click', () => {
-  orbitLines.visible = !orbitLines.visible;
-  btn('orbits').textContent = orbitLines.visible ? 'Orbits: ON' : 'Orbits: OFF';
+  orbitBoost = !orbitBoost;
+  const o = orbitBoost ? 1 : 0.55;
+  for (const c of orbitLines.children) {
+    (c as THREE.Line).material.opacity = o;
+  }
+  btn('orbits').textContent = orbitBoost ? 'Quỹ đạo: sáng 100%' : 'Quỹ đạo: mặc định';
 });
 btn('belt').addEventListener('click', () => {
   belt.visible = !belt.visible;

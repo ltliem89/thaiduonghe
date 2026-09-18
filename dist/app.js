@@ -23521,9 +23521,14 @@ void main() {
     camState.autoRotate = !camState.autoRotate;
     btn("turntable").textContent = camState.autoRotate ? "Turntable: ON" : "Turntable: OFF";
   });
+  var orbitBoost = false;
   btn("orbits").addEventListener("click", () => {
-    orbitLines.visible = !orbitLines.visible;
-    btn("orbits").textContent = orbitLines.visible ? "Orbits: ON" : "Orbits: OFF";
+    orbitBoost = !orbitBoost;
+    const o = orbitBoost ? 1 : 0.55;
+    for (const c of orbitLines.children) {
+      c.material.opacity = o;
+    }
+    btn("orbits").textContent = orbitBoost ? "Qu\u1EF9 \u0111\u1EA1o: s\xE1ng 100%" : "Qu\u1EF9 \u0111\u1EA1o: m\u1EB7c \u0111\u1ECBnh";
   });
   btn("belt").addEventListener("click", () => {
     belt.visible = !belt.visible;
