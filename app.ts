@@ -1970,9 +1970,10 @@ btn('turntable').addEventListener('click', () => {
 let orbitBoost = false;
 btn('orbits').addEventListener('click', () => {
   orbitBoost = !orbitBoost;
-  const o = orbitBoost ? 1 : 0.55;
   for (const c of orbitLines.children) {
-    (c as THREE.Line).material.opacity = o;
+    const m = (c as THREE.Line).material as THREE.LineBasicMaterial;
+    m.color.setHex(orbitBoost ? 0x9fb6ff : 0x3a4356);
+    m.opacity = orbitBoost ? 1 : 0.55;
   }
   btn('orbits').textContent = orbitBoost ? 'Quỹ đạo: sáng 100%' : 'Quỹ đạo: mặc định';
 });

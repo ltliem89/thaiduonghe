@@ -23524,9 +23524,10 @@ void main() {
   var orbitBoost = false;
   btn("orbits").addEventListener("click", () => {
     orbitBoost = !orbitBoost;
-    const o = orbitBoost ? 1 : 0.55;
     for (const c of orbitLines.children) {
-      c.material.opacity = o;
+      const m = c.material;
+      m.color.setHex(orbitBoost ? 10467071 : 3818326);
+      m.opacity = orbitBoost ? 1 : 0.55;
     }
     btn("orbits").textContent = orbitBoost ? "Qu\u1EF9 \u0111\u1EA1o: s\xE1ng 100%" : "Qu\u1EF9 \u0111\u1EA1o: m\u1EB7c \u0111\u1ECBnh";
   });
