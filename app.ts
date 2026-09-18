@@ -1506,7 +1506,7 @@ let zoomT = distToT(0.09);
 // Whole solar system fits the 45° FOV with margin here (Neptune orbit is
 // ~0.055 ly radius, diameter ~0.11 ly). Used by the home button and the
 // wheel "detent" that snaps back to this exact framing.
-const SOLAR_FIT_DIST = 0.17;
+const SOLAR_FIT_DIST = 0.17 / 1.5; // 1.5x closer so the solar system fills the screen
 const SOLAR_FIT_T = distToT(SOLAR_FIT_DIST);
 let flightTarget: THREE.Vector3 | null = null;
 let snapArmed = true;
@@ -1642,27 +1642,16 @@ canvas.addEventListener('wheel', (e: WheelEvent) => {
   const d = camState.targetDist;
   const speedMul = d >= 1 ? 1 : d <= SOLAR_FIT_DIST ? 0.2 :
     1 - 0.8 * (Math.log10(d) - 0) / (Math.log10(SOLAR_FIT_DIST) - 0);
-  zoomT = THREE.MathUtils.clamp(zoomT + e.deltaY * 0.0006 * Math.max(0.2, speedMul), 0, 1);
-  let dist = tToDist(zoomT);
-  // hard stop at the full-solar-system framing: can't wheel deeper into the
-  // Sun unless a planet/sun is explicitly followed (selectPlanet/sunFocus)
-  const floorDist = selectedPivot || sunFocus ? ZOOM_MIN : SOLAR_FIT_DIST;
-  if (dist < floorDist) {
-    dist = floorDist;
-    zoomT = distToT(floorDist);
-  }
-  // magnetic "detent": scrolling near the full-solar-system framing snaps to
-  // it and nudges the view back to the Sun (re-arms only after leaving the band)
-  const lgD = Math.log10(dist);
+  // deceleration "notch" right at the full-system framing: extra resistance,
+  // but the wheel can still pass through and keep zooming in
+  const lgDthis = Math.log10(d);
   const lgFit = Math.log10(SOLAR_FIT_DIST);
-  const band = 0.09;
-  if (snapArmed && Math.abs(lgD - lgFit) <= band) {
-    dist = SOLAR_FIT_DIST;
-    zoomT = SOLAR_FIT_T;
-    snapArmed = false;
+  const notchMul = Math.abs(lgDthis - lgFit) <= 0.05 ? 0.35 : 1;
+  zoomT = THREE.MathUtils.clamp(zoomT + e.deltaY * 0.0006 * Math.max(0.2, speedMul) * notchMul, 0, 1);
+  const dist = tToDist(zoomT);
+  // re-centre on the solar system as we cross into the full-system view
+  if (e.deltaY > 0 && dist < SOLAR_FIT_DIST && camState.target.distanceTo(SUN_ANCHOR) > 1) {
     flightTarget = SUN_ANCHOR.clone();
-  } else if (!snapArmed && Math.abs(lgD - lgFit) > band * 1.6) {
-    snapArmed = true;
   }
   camState.targetDist = dist;
   if (camState.targetDist > 0.5) deselectPlanet();
@@ -1699,8 +1688,8 @@ planetSelect.addEventListener('change', () => {
     deselectPlanet();
     sunFocus = true;
     flightTarget = SUN_ANCHOR.clone();
-    camState.targetDist = SOLAR_FIT_DIST * 0.5;
-    zoomT = distToT(SOLAR_FIT_DIST * 0.5);
+    camState.targetDist = SOLAR_FIT_DIST;
+    zoomT = SOLAR_FIT_T;
     snapArmed = false;
     chaseName.textContent = 'Mặt Trời';
     planetSelect.value = 'Sun';

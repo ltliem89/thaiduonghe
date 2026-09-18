@@ -23097,7 +23097,7 @@ void main() {
     autoRotate: true
   };
   var zoomT = distToT(0.09);
-  var SOLAR_FIT_DIST = 0.17;
+  var SOLAR_FIT_DIST = 0.17 / 1.5;
   var SOLAR_FIT_T = distToT(SOLAR_FIT_DIST);
   var flightTarget = null;
   var snapArmed = true;
@@ -23216,23 +23216,13 @@ void main() {
     e.preventDefault();
     const d = camState.targetDist;
     const speedMul = d >= 1 ? 1 : d <= SOLAR_FIT_DIST ? 0.2 : 1 - 0.8 * (Math.log10(d) - 0) / (Math.log10(SOLAR_FIT_DIST) - 0);
-    zoomT = MathUtils.clamp(zoomT + e.deltaY * 6e-4 * Math.max(0.2, speedMul), 0, 1);
-    let dist = tToDist(zoomT);
-    const floorDist = selectedPivot || sunFocus ? ZOOM_MIN : SOLAR_FIT_DIST;
-    if (dist < floorDist) {
-      dist = floorDist;
-      zoomT = distToT(floorDist);
-    }
-    const lgD = Math.log10(dist);
+    const lgDthis = Math.log10(d);
     const lgFit = Math.log10(SOLAR_FIT_DIST);
-    const band = 0.09;
-    if (snapArmed && Math.abs(lgD - lgFit) <= band) {
-      dist = SOLAR_FIT_DIST;
-      zoomT = SOLAR_FIT_T;
-      snapArmed = false;
+    const notchMul = Math.abs(lgDthis - lgFit) <= 0.05 ? 0.35 : 1;
+    zoomT = MathUtils.clamp(zoomT + e.deltaY * 6e-4 * Math.max(0.2, speedMul) * notchMul, 0, 1);
+    const dist = tToDist(zoomT);
+    if (e.deltaY > 0 && dist < SOLAR_FIT_DIST && camState.target.distanceTo(SUN_ANCHOR) > 1) {
       flightTarget = SUN_ANCHOR.clone();
-    } else if (!snapArmed && Math.abs(lgD - lgFit) > band * 1.6) {
-      snapArmed = true;
     }
     camState.targetDist = dist;
     if (camState.targetDist > 0.5) deselectPlanet();
@@ -23273,8 +23263,8 @@ void main() {
       deselectPlanet();
       sunFocus = true;
       flightTarget = SUN_ANCHOR.clone();
-      camState.targetDist = SOLAR_FIT_DIST * 0.5;
-      zoomT = distToT(SOLAR_FIT_DIST * 0.5);
+      camState.targetDist = SOLAR_FIT_DIST;
+      zoomT = SOLAR_FIT_T;
       snapArmed = false;
       chaseName.textContent = "M\u1EB7t Tr\u1EDDi";
       planetSelect.value = "Sun";
