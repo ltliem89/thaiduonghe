@@ -23314,6 +23314,8 @@ void main() {
   var flightTarget = null;
   var snapArmed = true;
   var sunFocus = false;
+  var notchLocked = true;
+  var lockScroll = 0;
   var hashZ = /#z=([\d.+-eE]+)/.exec(location.hash);
   if (hashZ) {
     const v = MathUtils.clamp(parseFloat(hashZ[1]), ZOOM_MIN, ZOOM_MAX);
@@ -23431,9 +23433,32 @@ void main() {
     const lgDthis = Math.log10(d);
     const lgFit = Math.log10(SOLAR_FIT_DIST);
     const notchMul = Math.abs(lgDthis - lgFit) <= 0.05 ? 0.35 : 1;
-    zoomT = MathUtils.clamp(zoomT + e.deltaY * 6e-4 * Math.max(0.2, speedMul) * notchMul, 0, 1);
+    let delta = e.deltaY * 6e-4 * Math.max(0.2, speedMul) * notchMul;
+    const newT = MathUtils.clamp(zoomT + delta, 0, 1);
+    const zoomIn = tToDist(newT) < tToDist(zoomT);
+    if (zoomIn) {
+      if (notchLocked) {
+        if (zoomT <= SOLAR_FIT_T) {
+          lockScroll += Math.abs(e.deltaY);
+          if (lockScroll > 300) {
+            notchLocked = false;
+          } else if (zoomT + delta < SOLAR_FIT_T) {
+            delta = SOLAR_FIT_T - zoomT;
+          }
+        }
+        if (notchLocked && zoomT + delta < SOLAR_FIT_T) {
+          delta = SOLAR_FIT_T - zoomT;
+        }
+      }
+    } else if (!zoomIn) {
+      if (tToDist(zoomT) > SOLAR_FIT_DIST * 1.25) {
+        notchLocked = true;
+        lockScroll = 0;
+      }
+    }
+    zoomT = MathUtils.clamp(zoomT + delta, 0, 1);
     const dist = tToDist(zoomT);
-    if (e.deltaY > 0 && dist < SOLAR_FIT_DIST && camState.target.distanceTo(SUN_ANCHOR) > 1) {
+    if (zoomIn && dist < SOLAR_FIT_DIST && camState.target.distanceTo(SUN_ANCHOR) > 1) {
       flightTarget = SUN_ANCHOR.clone();
     }
     camState.targetDist = dist;

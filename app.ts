@@ -1744,6 +1744,11 @@ let flightTarget: THREE.Vector3 | null = null;
 let snapArmed = true;
 // true only after explicitly choosing "Mặt Trời": wheel may then fly in close
 let sunFocus = false;
+// full-system framing "detent": wheel decelerates, then stops exactly at the
+// solar-system view; sustained scrolling punches through at reduced speed.
+// Relocks when zooming back out past 1.25x the fit distance.
+let notchLocked = true;
+let lockScroll = 0;
 
 // optional deep-view start: open e.g. ...?#z=1e5 to begin zoomed at that dist
 const hashZ = /#z=([\d.+-eE]+)/.exec(location.hash);
@@ -1874,15 +1879,47 @@ canvas.addEventListener('wheel', (e: WheelEvent) => {
   const d = camState.targetDist;
   const speedMul = d >= 1 ? 1 : d <= SOLAR_FIT_DIST ? 0.2 :
     1 - 0.8 * (Math.log10(d) - 0) / (Math.log10(SOLAR_FIT_DIST) - 0);
-  // deceleration "notch" right at the full-system framing: extra resistance,
-  // but the wheel can still pass through and keep zooming in
+  // deceleration ramp toward the full-system framing: extra resistance near
+  // the boundary, then a hard hold until sustained scrolling punches through
   const lgDthis = Math.log10(d);
   const lgFit = Math.log10(SOLAR_FIT_DIST);
   const notchMul = Math.abs(lgDthis - lgFit) <= 0.05 ? 0.35 : 1;
-  zoomT = THREE.MathUtils.clamp(zoomT + e.deltaY * 0.0006 * Math.max(0.2, speedMul) * notchMul, 0, 1);
+
+  let delta = e.deltaY * 0.0006 * Math.max(0.2, speedMul) * notchMul;
+  const newT = THREE.MathUtils.clamp(zoomT + delta, 0, 1);
+  const zoomIn = tToDist(newT) < tToDist(zoomT);
+
+  if (zoomIn) {
+    // approaching inward: the full-system framing is a detent — ease off at
+    // the boundary (notchMul above), then hold exactly at the fit until the
+    // user keeps scrolling (accumulated lockScroll), then resume at reduced
+    // speed (speedMul 1→0.2) without re-clamping.
+    if (notchLocked) {
+      if (zoomT <= SOLAR_FIT_T) {
+        lockScroll += Math.abs(e.deltaY);
+        if (lockScroll > 300) {
+          notchLocked = false;
+        } else if (zoomT + delta < SOLAR_FIT_T) {
+          delta = SOLAR_FIT_T - zoomT;
+        }
+      }
+      if (notchLocked && zoomT + delta < SOLAR_FIT_T) {
+        // safety: never dip below the fit line while the lock is engaged
+        delta = SOLAR_FIT_T - zoomT;
+      }
+    }
+  } else if (!zoomIn) {
+    // zooming back out clears the lock once we're clearly past the fit system
+    if (tToDist(zoomT) > SOLAR_FIT_DIST * 1.25) {
+      notchLocked = true;
+      lockScroll = 0;
+    }
+  }
+
+  zoomT = THREE.MathUtils.clamp(zoomT + delta, 0, 1);
   const dist = tToDist(zoomT);
   // re-centre on the solar system as we cross into the full-system view
-  if (e.deltaY > 0 && dist < SOLAR_FIT_DIST && camState.target.distanceTo(SUN_ANCHOR) > 1) {
+  if (zoomIn && dist < SOLAR_FIT_DIST && camState.target.distanceTo(SUN_ANCHOR) > 1) {
     flightTarget = SUN_ANCHOR.clone();
   }
   camState.targetDist = dist;
